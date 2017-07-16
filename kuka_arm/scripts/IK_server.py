@@ -58,25 +58,23 @@ R_x_roll = Matrix([[           1,          0,          0],
 Rrpy_global = R_z_yaw * R_y_pitch * R_x_roll
 
 def handle_calculate_IK(req):
-    print "Inside Function, start"
     global R_corr_inv, Rrpy_global
 
     #Defining DH parameter symbols.
-    alpha0, alpha1, alpha2, alpha3, alpha4, alpha5, alpha6 = symbols('alpha0:7')
-    a0, a1, a2, a3, a4, a5, a6 = symbols('a0:7')
-    d1, d2, d3, d4, d5, d6, d7 = symbols('d1:8')
+    alpha0, alpha1, alpha2 = symbols('alpha0:3')
+    a0, a1, a2, a3 = symbols('a0:4')
+    d1, d2, d3, d4 = symbols('d1:5')
+    d7 = symbols('d7') #Define the offset between the wrist center and the end effector.
 
     #Defining joint angle symbols.
-    q1, q2, q3, q4, q5, q6, q7 = symbols('q1:8')
+    q1, q2, q3= symbols('q1:4')
 
     #Dictionary for the DH parameters.
     s = {alpha0:     0,  a0:     0,  d1:  0.75,
          alpha1: -pi/2,  a1:  0.35,  d2:     0,  q2:q2-pi/2, #Defining the 90 degree offset.
          alpha2:     0,  a2:  1.25,  d3:     0,
-         alpha3: -pi/2,  a3:-0.054,  d4:  1.50,
-         alpha4:  pi/2,  a4:     0,  d5:     0,
-         alpha5: -pi/2,  a5:     0,  d6:     0,
-         alpha6:     0,  a6:     0,  d7: 0.303,  q7:0}
+                         a3:-0.054,  d4:  1.50,
+                                     d7: 0.303}
 
     #Defining the individual rotation matrices.
     R0_1 = Matrix([[             cos(q1),            -sin(q1),            0],
