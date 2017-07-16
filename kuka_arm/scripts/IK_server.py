@@ -18,39 +18,105 @@ from geometry_msgs.msg import Pose
 from mpmath import *
 from sympy import *
 
+#Solving WC coordinates from the equation [WC_x,WC_y,WC_z] = [p_x,p_y,p_z] - R0_6 * [0,0,d7]
+# where R0_6 is Rrpy * R_corr.inv() as the gripper frame that gives
+# us the pose and the URDF frame are not aligned.
+
+#First, we need a correction matrix.
+
+#Now, for the intrinsic rotations of the gripper axis,
+# as it is different in our DH convention and the URDF file.
+R_z = Matrix([[    cos(pi),   -sin(pi),          0],
+             [    sin(pi),    cos(pi),          0],
+             [          0,          0,          1]])
+
+R_y = Matrix([[ cos(-pi/2),          0, sin(-pi/2)],
+             [          0,          1,          0],
+             [-sin(-pi/2),          0, cos(-pi/2)]])
+
+#For Intrinsic Rotations:
+R_corr = R_z * R_y
+R_corr = R_corr.evalf()
+R_corr_inv = R_corr.inv()
+
+#Defining symbolic roll, pitch and yaw variables to enable global Rrpy calculation outside the loop.
+roll_sym, pitch_sym, yaw_sym = symbols("roll_sym, pitch_sym, yaw_sym")
+
+#Defining the rotation matrices.
+R_z_yaw = Matrix([[    cos(yaw_sym),   -sin(yaw_sym),          0],
+                 [    sin(yaw_sym),    cos(yaw_sym),          0],
+                 [           0,           0,          1]])
+
+R_y_pitch = Matrix([[ cos(pitch_sym),          0, sin(pitch_sym)],
+                   [          0,          1,          0],
+                   [-sin(pitch_sym),          0, cos(pitch_sym)]])
+
+R_x_roll = Matrix([[           1,          0,          0],
+                  [           0,  cos(roll_sym), -sin(roll_sym)],
+                  [           0,  sin(roll_sym),  cos(roll_sym)]])
+
+Rrpy_global = R_z_yaw * R_y_pitch * R_x_roll
 
 def handle_calculate_IK(req):
+    print "Inside Function, start"
+    global R_corr_inv, Rrpy_global
+
+    #Defining DH parameter symbols.
+    alpha0, alpha1, alpha2, alpha3, alpha4, alpha5, alpha6 = symbols('alpha0:7')
+    a0, a1, a2, a3, a4, a5, a6 = symbols('a0:7')
+    d1, d2, d3, d4, d5, d6, d7 = symbols('d1:8')
+
+    #Defining joint angle symbols.
+    q1, q2, q3, q4, q5, q6, q7 = symbols('q1:8')
+
+    #Dictionary for the DH parameters.
+    s = {alpha0:     0,  a0:     0,  d1:  0.75,
+         alpha1: -pi/2,  a1:  0.35,  d2:     0,  q2:q2-pi/2, #Defining the 90 degree offset.
+         alpha2:     0,  a2:  1.25,  d3:     0,
+         alpha3: -pi/2,  a3:-0.054,  d4:  1.50,
+         alpha4:  pi/2,  a4:     0,  d5:     0,
+         alpha5: -pi/2,  a5:     0,  d6:     0,
+         alpha6:     0,  a6:     0,  d7: 0.303,  q7:0}
+
+    #Defining the individual rotation matrices.
+    R0_1 = Matrix([[             cos(q1),            -sin(q1),            0],
+                   [ sin(q1)*cos(alpha0), cos(q1)*cos(alpha0), -sin(alpha0)],
+                   [ sin(q1)*sin(alpha0), cos(q1)*sin(alpha0),  cos(alpha0)]])
+    R0_1 = R0_1.subs(s)
+
+    R1_2 = Matrix([[             cos(q2),            -sin(q2),            0],
+                   [ sin(q2)*cos(alpha1), cos(q2)*cos(alpha1), -sin(alpha1)],
+                   [ sin(q2)*sin(alpha1), cos(q2)*sin(alpha1),  cos(alpha1)]])
+    R1_2 = R1_2.subs(s)
+
+    R2_3 = Matrix([[             cos(q3),            -sin(q3),            0],
+                   [ sin(q3)*cos(alpha2), cos(q3)*cos(alpha2), -sin(alpha2)],
+                   [ sin(q3)*sin(alpha2), cos(q3)*sin(alpha2),  cos(alpha2)]])
+    R2_3 = R2_3.subs(s)
+
+    R0_2 = R0_1 * R1_2 
+    R0_3 = R0_2 * R2_3
+
+    R0_3_inv_main = R0_3.inv()
+
     rospy.loginfo("Received %s eef-poses from the plan" % len(req.poses))
+
     if len(req.poses) < 1:
         print "No valid poses received"
         return -1
     else:
         # Initialize service response
         joint_trajectory_list = []
+        eef_pose_count = 0
         for x in xrange(0, len(req.poses)):
+            eef_pose_count += 1
+            print "Calculating IK for eef pose # ", eef_pose_count
             # IK code starts here
             joint_trajectory_point = JointTrajectoryPoint()
 
-            #Defining DH parameter symbols.
-            alpha0, alpha1, alpha2, alpha3, alpha4, alpha5, alpha6 = symbols('alpha0:7')
-            a0, a1, a2, a3, a4, a5, a6 = symbols('a0:7')
-            d1, d2, d3, d4, d5, d6, d7 = symbols('d1:8')
-
-            #Defining joint angle symbols.
-            q1, q2, q3, q4, q5, q6, q7 = symbols('q1:8')
-
-            #Dictionary for the DH parameters.
-            s = {alpha0:     0,  a0:     0,  d1:  0.75,
-                 alpha1: -pi/2,  a1:  0.35,  d2:     0,  q2:q2-pi/2, #Defining the 90 degree offset.
-                 alpha2:     0,  a2:  1.25,  d3:     0,
-                 alpha3: -pi/2,  a3:-0.054,  d4:  1.50,
-                 alpha4:  pi/2,  a4:     0,  d5:     0,
-                 alpha5: -pi/2,  a5:     0,  d6:     0,
-                 alpha6:     0,  a6:     0,  d7: 0.303,  q7:0}
-
             # Extract end-effector position and orientation from request
-	        # px,py,pz = end-effector position
-	        # roll, pitch, yaw = end-effector orientation
+            # px,py,pz = end-effector position
+            # roll, pitch, yaw = end-effector orientation
             px = req.poses[x].position.x
             py = req.poses[x].position.y
             pz = req.poses[x].position.z
@@ -65,35 +131,11 @@ def handle_calculate_IK(req):
             # where R0_6 is Rrpy * R_corr.inv() as the gripper frame that gives
             # us the pose and the URDF frame are not aligned.
 
-            #First, we need a correction matrix.
+            #The correction matrix, R_corr is already calculated.
 
-            #Now, for the intrinsic rotations of the gripper axis,
-            # as it is different in our DH convention and the URDF file.
-            R_z = Matrix([[    cos(pi),   -sin(pi),          0],
-                         [    sin(pi),    cos(pi),          0],
-                         [          0,          0,          1]])
-
-            R_y = Matrix([[ cos(-pi/2),          0, sin(-pi/2)],
-                         [          0,          1,          0],
-                         [-sin(-pi/2),          0, cos(-pi/2)]])
-
-            #For Intrinsic Rotations:
-            R_corr = simplify(R_z * R_y)
-
-            #Defining the rotation matrices.
-            R_z_yaw = Matrix([[    cos(yaw),   -sin(yaw),          0],
-                             [    sin(yaw),    cos(yaw),          0],
-                             [           0,           0,          1]])
-
-            R_y_pitch = Matrix([[ cos(pitch),          0, sin(pitch)],
-                               [          0,          1,          0],
-                               [-sin(pitch),          0, cos(pitch)]])
-
-            R_x_roll = Matrix([[           1,          0,          0],
-                              [           0,  cos(roll), -sin(roll)],
-                              [           0,  sin(roll),  cos(roll)]])
-
-            Rrpy = R_z_yaw * R_y_pitch * R_x_roll
+            #Rrpy has been calculated symbolically outside the loop.
+            #Substituing the actual values of roll, pitch and yaw.
+            Rrpy = Rrpy_global.evalf(subs={roll_sym:roll, pitch_sym:pitch, yaw_sym:yaw})
 
             #Defining the location column vectors.
 
@@ -103,7 +145,10 @@ def handle_calculate_IK(req):
             # relative to the Wrist Coordinates.
 
             #Equation for getting the World Cordinates as a column vector.
-            WC_loc_vector = p_loc_vector - Rrpy*R_corr.inv()*dG_vector
+            #Need to perform: WC_loc_vector = p_loc_vector - Rrpy*R_corr_inv*dG_vector
+            Rrpy_corr = Rrpy*R_corr_inv
+            dG_vector_rotated = Rrpy_corr*dG_vector
+            WC_loc_vector = p_loc_vector - dG_vector_rotated
 
             #Defining the wrist coordinates from the column vector made above.
             WC_x = WC_loc_vector[0]
@@ -142,30 +187,17 @@ def handle_calculate_IK(req):
             #Multiplying both sides with the inverse of R0_3
             #R3_6 = R0_3.inv() * Rrpy * R_corr.inv()
 
-            #So now we need R0_3.
-            #Defining the individual rotation matrices.
-            R0_1 = Matrix([[             cos(q1),            -sin(q1),            0],
-                           [ sin(q1)*cos(alpha0), cos(q1)*cos(alpha0), -sin(alpha0)],
-                           [ sin(q1)*sin(alpha0), cos(q1)*sin(alpha0),  cos(alpha0)]])
-            R0_1 = R0_1.subs(s)
+            #So now we need R0_3 and this has already been defined symbolically outside the loop.
 
-            R1_2 = Matrix([[             cos(q2),            -sin(q2),            0],
-                           [ sin(q2)*cos(alpha1), cos(q2)*cos(alpha1), -sin(alpha1)],
-                           [ sin(q2)*sin(alpha1), cos(q2)*sin(alpha1),  cos(alpha1)]])
-            R1_2 = R1_2.subs(s)
-
-            R2_3 = Matrix([[             cos(q3),            -sin(q3),            0],
-                           [ sin(q3)*cos(alpha2), cos(q3)*cos(alpha2), -sin(alpha2)],
-                           [ sin(q3)*sin(alpha2), cos(q3)*sin(alpha2),  cos(alpha2)]])
-            R2_3 = R2_3.subs(s)
-
-            R0_2 = simplify(R0_1 * R1_2) 
-            R0_3 = simplify(R0_2 * R2_3)
+            #Need to perform: R3_6 = R0_3_inv * Rrpy * R_corr_inv
+            # Rrpy * R_corr_inv = Rrpy_corr calculated above.
+            R0_3_inv = R0_3_inv_main.evalf(subs={q1:theta1,q2:theta2,q3:theta3})
+            R3_6 = R0_3_inv * Rrpy_corr
+            R3_6.evalf()
 
             #Substituing in the known values of the first three angles.
 
-            R3_6 = R0_3.inv() * Rrpy * R_corr.inv()
-            R3_6 = R3_6.evalf(subs={q1:theta1,q2:theta2,q3:theta3})
+            #R3_6 = R3_6
 
             ###### Now solving for the Euler angles from R3_6 ######
 
@@ -200,10 +232,11 @@ def handle_calculate_IK(req):
             q6 = atan2(-R3_6[1,1],R3_6[1,0])
 
             theta4, theta5, theta6 = q4,q5,q6
+            print "Done calculating IK for eef pose # ", eef_pose_count
 
-        # Populate response for the IK request
-	    joint_trajectory_point.positions = [theta1, theta2, theta3, theta4, theta5, theta6]
-	    joint_trajectory_list.append(joint_trajectory_point)
+            # Populate response for the IK request
+            joint_trajectory_point.positions = [theta1, theta2, theta3, theta4, theta5, theta6]
+            joint_trajectory_list.append(joint_trajectory_point)
 
         rospy.loginfo("length of Joint Trajectory List: %s" % len(joint_trajectory_list))
         return CalculateIKResponse(joint_trajectory_list)
