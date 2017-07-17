@@ -26,36 +26,50 @@ from sympy import *
 
 #Now, for the intrinsic rotations of the gripper axis,
 # as it is different in our DH convention and the URDF file.
-R_z = Matrix([[    cos(pi),   -sin(pi),          0],
-             [    sin(pi),    cos(pi),          0],
-             [          0,          0,          1]])
+# R_z = Matrix([[    cos(pi),   -sin(pi),          0],
+#              [    sin(pi),    cos(pi),          0],
+#              [          0,          0,          1]])
 
-R_y = Matrix([[ cos(-pi/2),          0, sin(-pi/2)],
-             [          0,          1,          0],
-             [-sin(-pi/2),          0, cos(-pi/2)]])
+# R_y = Matrix([[ cos(-pi/2),          0, sin(-pi/2)],
+#              [          0,          1,          0],
+#              [-sin(-pi/2),          0, cos(-pi/2)]])
 
-#For Intrinsic Rotations:
-R_corr = R_z * R_y
-R_corr = R_corr.evalf()
-R_corr_inv = R_corr.inv()
+# #For Intrinsic Rotations:
+# R_corr = R_z * R_y
+# R_corr = R_corr.evalf()
+# R_corr_inv = R_corr.inv()
+# R_corr_inv = simplify(R_corr_inv)
+# print R_corr_inv
+
+R_corr_inv = Matrix([[  0,    0, 1.0],
+                     [  0, -1.0,   0],
+                     [1.0,    0,   0]])
 
 #Defining symbolic roll, pitch and yaw variables to enable global Rrpy calculation outside the loop.
 roll_sym, pitch_sym, yaw_sym = symbols("roll_sym, pitch_sym, yaw_sym")
 
 #Defining the rotation matrices.
-R_z_yaw = Matrix([[    cos(yaw_sym),   -sin(yaw_sym),          0],
-                 [    sin(yaw_sym),    cos(yaw_sym),          0],
-                 [           0,           0,          1]])
+# R_z_yaw = Matrix([[    cos(yaw_sym),   -sin(yaw_sym),          0],
+#                  [    sin(yaw_sym),    cos(yaw_sym),          0],
+#                  [           0,           0,          1]])
 
-R_y_pitch = Matrix([[ cos(pitch_sym),          0, sin(pitch_sym)],
-                   [          0,          1,          0],
-                   [-sin(pitch_sym),          0, cos(pitch_sym)]])
+# R_y_pitch = Matrix([[ cos(pitch_sym),          0, sin(pitch_sym)],
+#                    [          0,          1,          0],
+#                    [-sin(pitch_sym),          0, cos(pitch_sym)]])
 
-R_x_roll = Matrix([[           1,          0,          0],
-                  [           0,  cos(roll_sym), -sin(roll_sym)],
-                  [           0,  sin(roll_sym),  cos(roll_sym)]])
+# R_x_roll = Matrix([[           1,          0,          0],
+#                   [           0,  cos(roll_sym), -sin(roll_sym)],
+#                   [           0,  sin(roll_sym),  cos(roll_sym)]])
 
-Rrpy_global = R_z_yaw * R_y_pitch * R_x_roll
+# Rrpy_global = R_z_yaw * R_y_pitch * R_x_roll
+# Rrpy_global = simplify(Rrpy_global)
+# print Rrpy_global
+
+Rrpy_global = Matrix([[cos(pitch_sym)*cos(yaw_sym), sin(pitch_sym)*sin(roll_sym)*cos(yaw_sym) - sin(yaw_sym)*cos(roll_sym), sin(pitch_sym)*cos(roll_sym)*cos(yaw_sym) + sin(roll_sym)*sin(yaw_sym)],
+                      [sin(yaw_sym)*cos(pitch_sym), sin(pitch_sym)*sin(roll_sym)*sin(yaw_sym) + cos(roll_sym)*cos(yaw_sym), sin(pitch_sym)*sin(yaw_sym)*cos(roll_sym) - sin(roll_sym)*cos(yaw_sym)],
+                      [            -sin(pitch_sym),                                           sin(roll_sym)*cos(pitch_sym),                                           cos(pitch_sym)*cos(roll_sym)]])
+
+
 
 def handle_calculate_IK(req):
     global R_corr_inv, Rrpy_global
@@ -77,25 +91,30 @@ def handle_calculate_IK(req):
                                      d7: 0.303}
 
     #Defining the individual rotation matrices.
-    R0_1 = Matrix([[             cos(q1),            -sin(q1),            0],
-                   [ sin(q1)*cos(alpha0), cos(q1)*cos(alpha0), -sin(alpha0)],
-                   [ sin(q1)*sin(alpha0), cos(q1)*sin(alpha0),  cos(alpha0)]])
-    R0_1 = R0_1.subs(s)
+    # R0_1 = Matrix([[             cos(q1),            -sin(q1),            0],
+    #                [ sin(q1)*cos(alpha0), cos(q1)*cos(alpha0), -sin(alpha0)],
+    #                [ sin(q1)*sin(alpha0), cos(q1)*sin(alpha0),  cos(alpha0)]])
+    # R0_1 = R0_1.subs(s)
 
-    R1_2 = Matrix([[             cos(q2),            -sin(q2),            0],
-                   [ sin(q2)*cos(alpha1), cos(q2)*cos(alpha1), -sin(alpha1)],
-                   [ sin(q2)*sin(alpha1), cos(q2)*sin(alpha1),  cos(alpha1)]])
-    R1_2 = R1_2.subs(s)
+    # R1_2 = Matrix([[             cos(q2),            -sin(q2),            0],
+    #                [ sin(q2)*cos(alpha1), cos(q2)*cos(alpha1), -sin(alpha1)],
+    #                [ sin(q2)*sin(alpha1), cos(q2)*sin(alpha1),  cos(alpha1)]])
+    # R1_2 = R1_2.subs(s)
 
-    R2_3 = Matrix([[             cos(q3),            -sin(q3),            0],
-                   [ sin(q3)*cos(alpha2), cos(q3)*cos(alpha2), -sin(alpha2)],
-                   [ sin(q3)*sin(alpha2), cos(q3)*sin(alpha2),  cos(alpha2)]])
-    R2_3 = R2_3.subs(s)
+    # R2_3 = Matrix([[             cos(q3),            -sin(q3),            0],
+    #                [ sin(q3)*cos(alpha2), cos(q3)*cos(alpha2), -sin(alpha2)],
+    #                [ sin(q3)*sin(alpha2), cos(q3)*sin(alpha2),  cos(alpha2)]])
+    # R2_3 = R2_3.subs(s)
 
-    R0_2 = R0_1 * R1_2 
-    R0_3 = R0_2 * R2_3
+    # R0_2 = simplify(R0_1 * R1_2) 
+    # R0_3 = simplify(R0_2 * R2_3)
 
-    R0_3_inv_main = R0_3.inv()
+    # R0_3_inv_main = R0_3.inv()
+    # print R0_3_inv_main
+
+    R0_3_inv_main = Matrix([[(sin(q1)*cos(q2 + q3)**2/(sin(q2 + q3)*cos(q1)) - sin(q1)/(sin(q2 + q3)*cos(q1)))*sin(q1) - cos(q2 + q3)**2/(sin(q2 + q3)*cos(q1)) + 1/(sin(q2 + q3)*cos(q1)), -(sin(q1)*cos(q2 + q3)**2/(sin(q2 + q3)*cos(q1)) - sin(q1)/(sin(q2 + q3)*cos(q1)))*cos(q1),  cos(q2 + q3)],
+                            [                                                                                                      -sin(q1)**2*cos(q2 + q3)/cos(q1) + cos(q2 + q3)/cos(q1),                                                                       sin(q1)*cos(q2 + q3), -sin(q2 + q3)],
+                            [                                                                                                                                                     -sin(q1),                                                                                    cos(q1),             0]])
 
     rospy.loginfo("Received %s eef-poses from the plan" % len(req.poses))
 
