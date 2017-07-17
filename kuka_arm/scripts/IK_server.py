@@ -69,7 +69,13 @@ Rrpy_global = Matrix([[cos(pitch_sym)*cos(yaw_sym), sin(pitch_sym)*sin(roll_sym)
                       [sin(yaw_sym)*cos(pitch_sym), sin(pitch_sym)*sin(roll_sym)*sin(yaw_sym) + cos(roll_sym)*cos(yaw_sym), sin(pitch_sym)*sin(yaw_sym)*cos(roll_sym) - sin(roll_sym)*cos(yaw_sym)],
                       [            -sin(pitch_sym),                                           sin(roll_sym)*cos(pitch_sym),                                           cos(pitch_sym)*cos(roll_sym)]])
 
+# Rrpy_corr_global = Rrpy_global * R_corr_inv
+# Rrpy_corr_global = simplify(Rrpy_corr_global)
+# print Rrpy_corr_global
 
+Rrpy_corr_global = Matrix([[1.0*sin(pitch_sym)*cos(roll_sym)*cos(yaw_sym) + 1.0*sin(roll_sym)*sin(yaw_sym), -1.0*sin(pitch_sym)*sin(roll_sym)*cos(yaw_sym) + 1.0*sin(yaw_sym)*cos(roll_sym), 1.0*cos(pitch_sym)*cos(yaw_sym)],
+                           [1.0*sin(pitch_sym)*sin(yaw_sym)*cos(roll_sym) - 1.0*sin(roll_sym)*cos(yaw_sym), -1.0*sin(pitch_sym)*sin(roll_sym)*sin(yaw_sym) - 1.0*cos(roll_sym)*cos(yaw_sym), 1.0*sin(yaw_sym)*cos(pitch_sym)],
+                           [                                              1.0*cos(pitch_sym)*cos(roll_sym),                                               -1.0*sin(roll_sym)*cos(pitch_sym),             -1.0*sin(pitch_sym)]])
 
 def handle_calculate_IK(req):
     global R_corr_inv, Rrpy_global
@@ -110,11 +116,12 @@ def handle_calculate_IK(req):
     # R0_3 = simplify(R0_2 * R2_3)
 
     # R0_3_inv_main = R0_3.inv()
+    # R0_3_inv_main = simplify(R0_3_inv_main)
     # print R0_3_inv_main
 
-    R0_3_inv_main = Matrix([[(sin(q1)*cos(q2 + q3)**2/(sin(q2 + q3)*cos(q1)) - sin(q1)/(sin(q2 + q3)*cos(q1)))*sin(q1) - cos(q2 + q3)**2/(sin(q2 + q3)*cos(q1)) + 1/(sin(q2 + q3)*cos(q1)), -(sin(q1)*cos(q2 + q3)**2/(sin(q2 + q3)*cos(q1)) - sin(q1)/(sin(q2 + q3)*cos(q1)))*cos(q1),  cos(q2 + q3)],
-                            [                                                                                                      -sin(q1)**2*cos(q2 + q3)/cos(q1) + cos(q2 + q3)/cos(q1),                                                                       sin(q1)*cos(q2 + q3), -sin(q2 + q3)],
-                            [                                                                                                                                                     -sin(q1),                                                                                    cos(q1),             0]])
+    R0_3_inv_main = Matrix([[sin(q2 + q3)*cos(q1), sin(q1)*sin(q2 + q3),  cos(q2 + q3)],
+                            [cos(q1)*cos(q2 + q3), sin(q1)*cos(q2 + q3), -sin(q2 + q3)],
+                            [            -sin(q1),              cos(q1),             0]])
 
     rospy.loginfo("Received %s eef-poses from the plan" % len(req.poses))
 
